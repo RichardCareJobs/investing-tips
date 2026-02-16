@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASX Investing Tips</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>ASX Investing Tips</h1>
+      <p class="intro">
+        Click <strong>Generate Tips</strong> to analyse a diversified set of ASX stocks (excluding airlines,
+        hospitality, fast food, and ETFs) using recent performance, sentiment from public commentary,
+        and analyst-style signal weighting.
+      </p>
+
+      <button id="generateBtn">Generate Tips</button>
+      <p id="status" aria-live="polite"></p>
+
+      <section id="results" class="hidden" aria-label="Top investment ideas">
+        <h2>Top 3 Strong Buy Projections</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ASX Code</th>
+              <th>Company</th>
+              <th>Current Price</th>
+              <th>Last 3m Growth %</th>
+              <th>Why it scored well</th>
+              <th>$500 → 3m</th>
+              <th>3m Growth %</th>
+              <th>$500 → 6m</th>
+              <th>6m Growth %</th>
+              <th>$500 → 9m</th>
+              <th>9m Growth %</th>
+              <th>$500 → 12m</th>
+              <th>12m Growth %</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </section>
+
+      <p class="disclaimer">
+        Projections are estimates, not guarantees or financial advice. Always do your own research.
+      </p>
+    </main>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
