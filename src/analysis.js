@@ -24,6 +24,15 @@ function annualizedVolatility(series) {
   return Math.sqrt(variance) * Math.sqrt(252);
 }
 
+function shuffle(array) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 export function projectSellValue(initialInvestment, annualReturn, months) {
   const years = months / 12;
   return initialInvestment * (1 + annualReturn) ** years;
@@ -99,7 +108,20 @@ export function scoreStock(stock, prices) {
   };
 }
 
-export async function generateTips() {
+function pickDiversifiedTopThree(sortedStocks, excludeCodes = []) {
+  const topPool = sortedStocks.slice(0, Math.min(10, sortedStocks.length));
+  const excludedSet = new Set(excludeCodes);
+
+  const withoutPrevious = topPool.filter((stock) => !excludedSet.has(stock.code));
+  if (withoutPrevious.length >= 3) {
+    return shuffle(withoutPrevious).slice(0, 3);
+  }
+
+  return shuffle(topPool).slice(0, 3);
+}
+
+export async function generateTips(options = {}) {
+  const { excludeCodes = [] } = options;
   const candidates = STOCK_UNIVERSE.filter((stock) => !EXCLUDED_SECTORS.includes(stock.sector));
 
   const analysed = await Promise.all(
@@ -117,26 +139,30 @@ export async function generateTips() {
     })
   );
 
-  return analysed
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((stock) => {
-      const projections = [3, 6, 9, 12].map((months) => ({
-        months,
-        projectedSellValue: projectSellValue(500, stock.annualReturn, months),
-      }));
+  const ranked = analysed.filter(Boolean).sort((a, b) => b.score - a.score);
 
+  return pickDiversifiedTopThree(ranked, excludeCodes).map((stock) => {
+    const projections = [3, 6, 9, 12].map((months) => {
+      const projectedSellValue = projectSellValue(500, stock.annualReturn, months);
+      const growthPct = pctChange(500, projectedSellValue);
       return {
-        ...stock,
-        rationale: [
-          `Performance: 3m ${Math.round(stock.diagnostics.r3m * 100)}%, 6m ${Math.round(
-            stock.diagnostics.r6m * 100
-          )}%`,
-          `Sentiment + reports: positive media/blog signal and analyst-style report weighting`,
-          `Data source: ${stock.diagnostics.source === "live" ? "live price feed" : "local fallback snapshot"}`,
-        ],
-        projections,
+        months,
+        projectedSellValue,
+        growthPct,
       };
     });
+
+    return {
+      ...stock,
+      last3mGrowthPct: stock.diagnostics.r3m,
+      rationale: [
+        `Performance: 3m ${Math.round(stock.diagnostics.r3m * 100)}%, 6m ${Math.round(
+          stock.diagnostics.r6m * 100
+        )}%`,
+        "Sentiment + reports: positive media/blog signal and analyst-style report weighting",
+        `Data source: ${stock.diagnostics.source === "live" ? "live price feed" : "local fallback snapshot"}`,
+      ],
+      projections,
+    };
+  });
 }

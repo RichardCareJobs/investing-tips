@@ -25,7 +25,7 @@ test('scoreStock returns diagnostics and annual return bounds', () => {
   assert.equal(typeof scored.diagnostics.r3m, 'number');
 });
 
-test('generateTips returns three stocks and excludes restricted sectors', async () => {
+test('generateTips returns three stocks, growth %, and excludes restricted sectors', async () => {
   const tips = await generateTips();
   assert.equal(tips.length, 3);
   for (const tip of tips) {
@@ -33,5 +33,22 @@ test('generateTips returns three stocks and excludes restricted sectors', async 
     assert.notEqual(tip.sector, 'Hospitality');
     assert.notEqual(tip.sector, 'Fast Food');
     assert.equal(tip.projections.length, 4);
+    assert.equal(typeof tip.last3mGrowthPct, 'number');
+    for (const projection of tip.projections) {
+      assert.equal(typeof projection.growthPct, 'number');
+      assert.ok(projection.projectedSellValue > 0);
+    }
+  }
+});
+
+test('generateTips can avoid previous picks when excludeCodes are provided', async () => {
+  const first = await generateTips();
+  const excluded = first.map((tip) => tip.code);
+
+  const second = await generateTips({ excludeCodes: excluded });
+  assert.equal(second.length, 3);
+
+  for (const tip of second) {
+    assert.ok(!excluded.includes(tip.code));
   }
 });
