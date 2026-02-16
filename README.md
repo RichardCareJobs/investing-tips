@@ -10,6 +10,8 @@ Interactive GitHub Pages web app for generating projected ASX investment tips.
   - public sentiment proxy signals (news/blog),
   - report-style weighting.
 - Outputs **3 strong buy ideas** with projected sell values for a **$500 investment** at 3, 6, 9 and 12 months.
+- Enforces fundamentals for selected picks: ROE > 20% (last 2 years), EPS growth > 15%, leverage < 1.0x.
+- Chooses one stock from each market-cap bucket: large cap, mid cap, and small cap.
 
 > Projections are estimates and not guarantees or financial advice.
 

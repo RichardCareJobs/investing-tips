@@ -2,6 +2,7 @@ import { STOCK_UNIVERSE, EXCLUDED_SECTORS } from "./stocks.js";
 import { LOCAL_PRICE_SERIES } from "./localPrices.js";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const CAP_BUCKETS = ["large", "mid", "small"];
 
 function pctChange(from, to) {
   if (!Number.isFinite(from) || !Number.isFinite(to) || from <= 0) return 0;
@@ -31,6 +32,10 @@ function shuffle(array) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function isFundamentallyEligible(stock) {
+  return stock.roeTwoYearMin > 0.2 && stock.epsGrowth > 0.15 && stock.leverageRatio < 1;
 }
 
 export function projectSellValue(initialInvestment, annualReturn, months) {
@@ -86,10 +91,15 @@ export function scoreStock(stock, prices) {
 
   const momentumSignal = clamp(0.45 * r3m + 0.35 * r6m + 0.2 * r12m, -0.35, 0.45);
   const sentimentSignal = clamp(0.55 * stock.newsSentiment + 0.45 * stock.blogSentiment, -0.4, 0.6);
+  const fundamentalSignal = clamp(0.4 * stock.roeTwoYearMin + 0.35 * stock.epsGrowth - 0.2 * stock.leverageRatio, -0.3, 0.5);
   const riskAdjusted = clamp(momentumSignal - 0.5 * vol, -0.4, 0.4);
 
   const totalScore =
-    0.42 * momentumSignal + 0.24 * sentimentSignal + 0.24 * stock.reportSignal + 0.1 * riskAdjusted;
+    0.35 * momentumSignal +
+    0.2 * sentimentSignal +
+    0.2 * stock.reportSignal +
+    0.15 * fundamentalSignal +
+    0.1 * riskAdjusted;
 
   const annualReturn = clamp(0.05 + (totalScore + 0.1) * 0.42, 0.02, 0.35);
 
@@ -108,21 +118,23 @@ export function scoreStock(stock, prices) {
   };
 }
 
-function pickDiversifiedTopThree(sortedStocks, excludeCodes = []) {
-  const topPool = sortedStocks.slice(0, Math.min(10, sortedStocks.length));
+function pickOneForCap(ranked, marketCapClass, excludeCodes = []) {
   const excludedSet = new Set(excludeCodes);
+  const byCap = ranked.filter((stock) => stock.marketCapClass === marketCapClass);
 
-  const withoutPrevious = topPool.filter((stock) => !excludedSet.has(stock.code));
-  if (withoutPrevious.length >= 3) {
-    return shuffle(withoutPrevious).slice(0, 3);
+  const withoutPrevious = byCap.filter((stock) => !excludedSet.has(stock.code));
+  if (withoutPrevious.length) {
+    return shuffle(withoutPrevious.slice(0, 3))[0];
   }
 
-  return shuffle(topPool).slice(0, 3);
+  return byCap[0] ?? null;
 }
 
 export async function generateTips(options = {}) {
   const { excludeCodes = [] } = options;
-  const candidates = STOCK_UNIVERSE.filter((stock) => !EXCLUDED_SECTORS.includes(stock.sector));
+  const candidates = STOCK_UNIVERSE.filter(
+    (stock) => !EXCLUDED_SECTORS.includes(stock.sector) && isFundamentallyEligible(stock)
+  );
 
   const analysed = await Promise.all(
     candidates.map(async (stock) => {
@@ -140,8 +152,9 @@ export async function generateTips(options = {}) {
   );
 
   const ranked = analysed.filter(Boolean).sort((a, b) => b.score - a.score);
+  const selected = CAP_BUCKETS.map((bucket) => pickOneForCap(ranked, bucket, excludeCodes)).filter(Boolean);
 
-  return pickDiversifiedTopThree(ranked, excludeCodes).map((stock) => {
+  return selected.map((stock) => {
     const projections = [3, 6, 9, 12].map((months) => {
       const projectedSellValue = projectSellValue(500, stock.annualReturn, months);
       const growthPct = pctChange(500, projectedSellValue);
@@ -159,7 +172,9 @@ export async function generateTips(options = {}) {
         `Performance: 3m ${Math.round(stock.diagnostics.r3m * 100)}%, 6m ${Math.round(
           stock.diagnostics.r6m * 100
         )}%`,
-        "Sentiment + reports: positive media/blog signal and analyst-style report weighting",
+        `Fundamentals: ROE 2y ${Math.round(stock.roeTwoYearMin * 100)}%, EPS growth ${Math.round(
+          stock.epsGrowth * 100
+        )}%, leverage ${stock.leverageRatio.toFixed(2)}x`,
         `Data source: ${stock.diagnostics.source === "live" ? "live price feed" : "local fallback snapshot"}`,
       ],
       projections,

@@ -15,9 +15,13 @@ test('scoreStock returns diagnostics and annual return bounds', () => {
     code: 'BHP',
     company: 'BHP Group',
     sector: 'Materials',
+    marketCapClass: 'large',
     newsSentiment: 0.2,
     blogSentiment: 0.2,
     reportSignal: 0.6,
+    roeTwoYearMin: 0.23,
+    epsGrowth: 0.18,
+    leverageRatio: 0.42,
   };
   const scored = scoreStock(stock, LOCAL_PRICE_SERIES.BHP);
   assert.ok(scored);
@@ -25,13 +29,22 @@ test('scoreStock returns diagnostics and annual return bounds', () => {
   assert.equal(typeof scored.diagnostics.r3m, 'number');
 });
 
-test('generateTips returns three stocks, growth %, and excludes restricted sectors', async () => {
+test('generateTips returns one large/mid/small and all fundamental constraints pass', async () => {
   const tips = await generateTips();
   assert.equal(tips.length, 3);
+
+  const caps = tips.map((tip) => tip.marketCapClass).sort();
+  assert.deepEqual(caps, ['large', 'mid', 'small']);
+
   for (const tip of tips) {
     assert.notEqual(tip.sector, 'Airlines');
     assert.notEqual(tip.sector, 'Hospitality');
     assert.notEqual(tip.sector, 'Fast Food');
+
+    assert.ok(tip.roeTwoYearMin > 0.2);
+    assert.ok(tip.epsGrowth > 0.15);
+    assert.ok(tip.leverageRatio < 1);
+
     assert.equal(tip.projections.length, 4);
     assert.equal(typeof tip.last3mGrowthPct, 'number');
     for (const projection of tip.projections) {

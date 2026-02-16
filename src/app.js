@@ -27,6 +27,7 @@ function renderRows(tips) {
     row.innerHTML = `
       <td>${tip.code}</td>
       <td>${tip.company}</td>
+      <td>${tip.marketCapClass}</td>
       <td>${formatDollars(tip.currentPrice)}</td>
       <td>${formatPercent(tip.last3mGrowthPct)}</td>
       <td>${tip.rationale.join("<br>")}</td>
